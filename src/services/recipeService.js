@@ -1,30 +1,15 @@
-import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    limit as firestoreLimit,
-    getDoc,
-    getDocs,
-    orderBy,
-    query,
-    runTransaction,
-    serverTimestamp,
-    startAfter,
-    where,
-} from "firebase/firestore";
-import { db } from "./firebase";
+import { db, FieldValue } from "./firebase";
 
-const recipesRef = collection(db, "recipes");
+const recipesRef = db.collection("recipes");
 
 export const getRecipes = async ({ category, limit = 20, lastDoc } = {}) => {
     try {
-        const constraints = [orderBy("createdAt", "desc")];
-        if (category) constraints.unshift(where("category", "==", category));
-        if (lastDoc) constraints.push(startAfter(lastDoc));
-        constraints.push(firestoreLimit(limit));
-        const q = query(recipesRef, ...constraints);
-        const snapshot = await getDocs(q);
+        let q = category
+            ? recipesRef.where("category", "==", category).orderBy("createdAt", "desc")
+            : recipesRef.orderBy("createdAt", "desc");
+        if (lastDoc) q = q.startAfter(lastDoc);
+        q = q.limit(limit);
+        const snapshot = await q.get();
         return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch (error) {
         console.error("Error fetching recipes:", error);
@@ -34,8 +19,8 @@ export const getRecipes = async ({ category, limit = 20, lastDoc } = {}) => {
 
 export const getRecipeById = async (recipeId) => {
     try {
-        const docSnap = await getDoc(doc(db, "recipes", recipeId));
-        if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() };
+        const docSnap = await recipesRef.doc(recipeId).get();
+        if (docSnap.exists) return { id: docSnap.id, ...docSnap.data() };
         return null;
     } catch (error) {
         console.error("Error fetching recipe:", error);
@@ -47,16 +32,14 @@ export const searchRecipes = async (searchQuery) => {
     try {
         const normalized = searchQuery.toLowerCase().trim();
 
-        // Fetch exact keyword matches and a broader set in parallel
         const [exactSnapshot, allSnapshot] = await Promise.all([
-            getDocs(query(recipesRef, where("keywords", "array-contains", normalized), firestoreLimit(20))),
-            getDocs(query(recipesRef, firestoreLimit(100))),
+            recipesRef.where("keywords", "array-contains", normalized).limit(20).get(),
+            recipesRef.limit(100).get(),
         ]);
 
         const exactIds = new Set(exactSnapshot.docs.map((d) => d.id));
         const exactResults = exactSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-        // Client-side partial matching on title, keywords, and category
         const partialResults = allSnapshot.docs
             .filter((d) => !exactIds.has(d.id))
             .map((d) => ({ id: d.id, ...d.data() }))
@@ -82,8 +65,7 @@ export const searchByIngredients = async (ingredients) => {
     if (!ingredients || ingredients.length === 0) return [];
     try {
         const firstIngredient = ingredients[0].toLowerCase().trim();
-        const q = query(recipesRef, where("keywords", "array-contains", firstIngredient), firestoreLimit(50));
-        const snapshot = await getDocs(q);
+        const snapshot = await recipesRef.where("keywords", "array-contains", firstIngredient).limit(50).get();
         let results = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
         if (ingredients.length === 1) return results;
         const otherIngredients = ingredients.slice(1).map((i) => i.toLowerCase().trim());
@@ -97,7 +79,7 @@ export const searchByIngredients = async (ingredients) => {
     } catch (error) {
         console.error("Error searching by ingredients:", error);
         try {
-            const allSnapshot = await getDocs(query(recipesRef, firestoreLimit(100)));
+            const allSnapshot = await recipesRef.limit(100).get();
             const allRecipes = allSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
             return allRecipes.filter((recipe) => {
                 const recipeIngredientNames = (recipe.ingredients || []).map((i) => i.name.toLowerCase());
@@ -114,11 +96,11 @@ export const searchByIngredients = async (ingredients) => {
 
 export const uploadRecipe = async (recipeData) => {
     try {
-        const docRef = await addDoc(recipesRef, {
+        const docRef = await recipesRef.add({
             ...recipeData,
             averageRating: 0,
             totalRatings: 0,
-            createdAt: serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
         });
         return { success: true, id: docRef.id };
     } catch (error) {
@@ -129,13 +111,11 @@ export const uploadRecipe = async (recipeData) => {
 
 export const deleteRecipe = async (recipeId) => {
     try {
-        // Delete all ratings in the subcollection first
-        const ratingsRef = collection(db, "recipes", recipeId, "ratings");
-        const ratingsSnapshot = await getDocs(ratingsRef);
-        const deletePromises = ratingsSnapshot.docs.map((d) => deleteDoc(d.ref));
+        const ratingsSnapshot = await recipesRef.doc(recipeId).collection("ratings").get();
+        const deletePromises = ratingsSnapshot.docs.map((d) => d.ref.delete());
         await Promise.all(deletePromises);
 
-        await deleteDoc(doc(db, "recipes", recipeId));
+        await recipesRef.doc(recipeId).delete();
 
         return { success: true };
     } catch (error) {
@@ -155,14 +135,14 @@ export const CATEGORIES = [
 
 export const rateRecipe = async (recipeId, userId, score, comment = "") => {
     try {
-        const recipeRef = doc(db, "recipes", recipeId);
-        const ratingRef = doc(db, "recipes", recipeId, "ratings", userId);
-        await runTransaction(db, async (transaction) => {
+        const recipeRef = recipesRef.doc(recipeId);
+        const ratingRef = recipesRef.doc(recipeId).collection("ratings").doc(userId);
+        await db.runTransaction(async (transaction) => {
             const recipeDoc = await transaction.get(recipeRef);
             const existingRating = await transaction.get(ratingRef);
             const data = recipeDoc.data();
             let { averageRating = 0, totalRatings = 0 } = data;
-            if (existingRating.exists()) {
+            if (existingRating.exists) {
                 const oldScore = existingRating.data().score;
                 const totalScore = averageRating * totalRatings - oldScore + score;
                 averageRating = totalScore / totalRatings;
@@ -171,7 +151,7 @@ export const rateRecipe = async (recipeId, userId, score, comment = "") => {
                 totalRatings += 1;
                 averageRating = totalScore / totalRatings;
             }
-            transaction.set(ratingRef, { score, comment, createdAt: serverTimestamp() });
+            transaction.set(ratingRef, { score, comment, createdAt: FieldValue.serverTimestamp() });
             transaction.update(recipeRef, {
                 averageRating: Math.round(averageRating * 10) / 10,
                 totalRatings,
@@ -186,9 +166,12 @@ export const rateRecipe = async (recipeId, userId, score, comment = "") => {
 
 export const getRecipeRatings = async (recipeId, limit = 10) => {
     try {
-        const ratingsRef = collection(db, "recipes", recipeId, "ratings");
-        const q = query(ratingsRef, orderBy("createdAt", "desc"), firestoreLimit(limit));
-        const snapshot = await getDocs(q);
+        const snapshot = await recipesRef
+            .doc(recipeId)
+            .collection("ratings")
+            .orderBy("createdAt", "desc")
+            .limit(limit)
+            .get();
         return snapshot.docs.map((d) => ({ userId: d.id, ...d.data() }));
     } catch (error) {
         console.error("Error fetching ratings:", error);

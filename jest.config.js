@@ -10,7 +10,7 @@ module.exports = {
     moduleNameMapper: {
         // Catch all paths that resolve to src/services/firebase — including
         // the "./firebase" import inside recipeService.js itself
-        "^(\\.\\.[\\/]services[\\/]firebase|\\.[\\/]firebase)$": "<rootDir>/src/__mocks__/firebase.js",
+        "^(\\.\\.[\\/](\\.\\.[\\/])?services[\\/]firebase|\\.[\\/]firebase)$": "<rootDir>/src/__mocks__/firebase.js",
         // AsyncStorage uses native modules — redirect to the official jest mock
         "@react-native-async-storage/async-storage": require.resolve(
             "@react-native-async-storage/async-storage/jest/async-storage-mock",

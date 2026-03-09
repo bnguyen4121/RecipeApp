@@ -1,6 +1,5 @@
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { db } from "../services/firebase";
+import { db, FieldValue } from "../services/firebase";
 import { useAuth } from "./AuthContext";
 
 const FavoritesContext = createContext();
@@ -17,11 +16,9 @@ export const FavoritesProvider = ({ children }) => {
         }
 
         setLoading(true);
-        const favRef = collection(db, "users", user.uid, "favorites");
-        const q = query(favRef, orderBy("savedAt", "desc"));
+        const q = db.collection("users").doc(user.uid).collection("favorites").orderBy("savedAt", "desc");
 
-        const unsubscribe = onSnapshot(
-            q,
+        const unsubscribe = q.onSnapshot(
             (snapshot) => {
                 const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
                 setFavorites(items);
@@ -40,14 +37,19 @@ export const FavoritesProvider = ({ children }) => {
         async (recipe) => {
             if (!user) return { success: false, error: "Not logged in" };
             try {
-                await setDoc(doc(db, "users", user.uid, "favorites", recipe.id), {
-                    recipeId: recipe.id,
-                    title: recipe.title,
-                    image: recipe.image,
-                    cookingTime: recipe.cookingTime,
-                    category: recipe.category,
-                    savedAt: serverTimestamp(),
-                });
+                await db
+                    .collection("users")
+                    .doc(user.uid)
+                    .collection("favorites")
+                    .doc(recipe.id)
+                    .set({
+                        recipeId: recipe.id,
+                        title: recipe.title,
+                        image: recipe.image,
+                        cookingTime: recipe.cookingTime,
+                        category: recipe.category,
+                        savedAt: FieldValue.serverTimestamp(),
+                    });
                 return { success: true };
             } catch (error) {
                 console.error("Error adding favorite:", error);
@@ -61,7 +63,7 @@ export const FavoritesProvider = ({ children }) => {
         async (recipeId) => {
             if (!user) return;
             try {
-                await deleteDoc(doc(db, "users", user.uid, "favorites", recipeId));
+                await db.collection("users").doc(user.uid).collection("favorites").doc(recipeId).delete();
             } catch (error) {
                 console.error("Error removing favorite:", error);
             }

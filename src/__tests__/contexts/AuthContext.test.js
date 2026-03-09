@@ -1,31 +1,8 @@
-jest.mock("firebase/auth", () => ({
-    createUserWithEmailAndPassword: jest.fn(),
-    signInWithEmailAndPassword: jest.fn(),
-    signOut: jest.fn(),
-    onAuthStateChanged: jest.fn(() => jest.fn()),
-    updateProfile: jest.fn(),
-}));
-
-jest.mock("firebase/firestore", () => ({
-    doc: jest.fn(() => "MOCK_DOC_REF"),
-    getDoc: jest.fn(),
-    setDoc: jest.fn(),
-    serverTimestamp: jest.fn(),
-    updateDoc: jest.fn(),
-}));
-
-const {
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    signOut: firebaseSignOut,
-    updateProfile,
-} = require("firebase/auth");
-
-const { setDoc } = require("firebase/firestore");
+import { auth, db } from "../../services/firebase";
 
 async function signIn(email, password) {
     try {
-        await signInWithEmailAndPassword({}, email, password);
+        await auth.signInWithEmailAndPassword(email, password);
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
@@ -34,9 +11,9 @@ async function signIn(email, password) {
 
 async function signUp(email, password, displayName) {
     try {
-        const { user: newUser } = await createUserWithEmailAndPassword({}, email, password);
-        await updateProfile(newUser, { displayName });
-        await setDoc("MOCK_DOC_REF", { displayName, email, dietaryPreferences: [] });
+        const { user: newUser } = await auth.createUserWithEmailAndPassword(email, password);
+        await newUser.updateProfile({ displayName });
+        await db.collection("users").doc(newUser.uid).set({ displayName, email, dietaryPreferences: [] });
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
@@ -45,7 +22,7 @@ async function signUp(email, password, displayName) {
 
 async function signOut() {
     try {
-        await firebaseSignOut({});
+        await auth.signOut();
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
@@ -56,13 +33,13 @@ beforeEach(() => jest.clearAllMocks());
 
 describe("signIn", () => {
     it("returns success:true on valid credentials", async () => {
-        signInWithEmailAndPassword.mockResolvedValueOnce({});
+        auth.signInWithEmailAndPassword.mockResolvedValueOnce({});
         const result = await signIn("a@b.com", "pass");
         expect(result).toEqual({ success: true });
     });
 
     it("returns success:false with error on bad credentials", async () => {
-        signInWithEmailAndPassword.mockRejectedValueOnce(new Error("Wrong password"));
+        auth.signInWithEmailAndPassword.mockRejectedValueOnce(new Error("Wrong password"));
         const result = await signIn("a@b.com", "wrong");
         expect(result).toEqual({ success: false, error: "Wrong password" });
     });
@@ -70,17 +47,16 @@ describe("signIn", () => {
 
 describe("signUp", () => {
     it("returns success:true and writes Firestore doc", async () => {
-        const mockUser = { uid: "uid1" };
-        createUserWithEmailAndPassword.mockResolvedValueOnce({ user: mockUser });
-        updateProfile.mockResolvedValueOnce();
-        setDoc.mockResolvedValueOnce();
+        const mockUser = { uid: "uid1", updateProfile: jest.fn().mockResolvedValue() };
+        auth.createUserWithEmailAndPassword.mockResolvedValueOnce({ user: mockUser });
+        db.collection().doc().set.mockResolvedValueOnce();
         const result = await signUp("new@b.com", "pass", "Alice");
-        expect(setDoc).toHaveBeenCalled();
+        expect(db.collection().doc().set).toHaveBeenCalled();
         expect(result).toEqual({ success: true });
     });
 
     it("returns success:false on Firebase error", async () => {
-        createUserWithEmailAndPassword.mockRejectedValueOnce(new Error("Email in use"));
+        auth.createUserWithEmailAndPassword.mockRejectedValueOnce(new Error("Email in use"));
         const result = await signUp("x@b.com", "pass", "Bob");
         expect(result).toEqual({ success: false, error: "Email in use" });
     });
@@ -88,7 +64,7 @@ describe("signUp", () => {
 
 describe("signOut", () => {
     it("returns success:true", async () => {
-        firebaseSignOut.mockResolvedValueOnce();
+        auth.signOut.mockResolvedValueOnce();
         const result = await signOut();
         expect(result).toEqual({ success: true });
     });

@@ -1,13 +1,5 @@
-import {
-    createUserWithEmailAndPassword,
-    signOut as firebaseSignOut,
-    onAuthStateChanged,
-    signInWithEmailAndPassword,
-    updateProfile,
-} from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState } from "react";
-import { auth, db } from "../services/firebase";
+import { auth, db, FieldValue } from "../services/firebase";
 
 const AuthContext = createContext();
 
@@ -20,7 +12,7 @@ export const AuthProvider = ({ children }) => {
         // Safety timeout — if Firebase doesn't respond in 10s, unblock the app
         const timeout = setTimeout(() => setLoading(false), 10000);
 
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
             clearTimeout(timeout);
             if (firebaseUser) {
                 setUser(firebaseUser);
@@ -40,8 +32,8 @@ export const AuthProvider = ({ children }) => {
 
     const fetchUserProfile = async (uid) => {
         try {
-            const docSnap = await getDoc(doc(db, "users", uid));
-            if (docSnap.exists()) {
+            const docSnap = await db.collection("users").doc(uid).get();
+            if (docSnap.exists) {
                 setUserProfile(docSnap.data());
             }
         } catch (error) {
@@ -51,15 +43,15 @@ export const AuthProvider = ({ children }) => {
 
     const signUp = async (email, password, displayName) => {
         try {
-            const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
-            await updateProfile(newUser, { displayName });
+            const { user: newUser } = await auth.createUserWithEmailAndPassword(email, password);
+            await newUser.updateProfile({ displayName });
 
-            await setDoc(doc(db, "users", newUser.uid), {
+            await db.collection("users").doc(newUser.uid).set({
                 displayName,
                 email,
                 dietaryPreferences: [],
                 photoURL: null,
-                createdAt: serverTimestamp(),
+                createdAt: FieldValue.serverTimestamp(),
             });
 
             return { success: true };
@@ -70,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
     const signIn = async (email, password) => {
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            await auth.signInWithEmailAndPassword(email, password);
             return { success: true };
         } catch (error) {
             return { success: false, error: error.message };
@@ -79,7 +71,7 @@ export const AuthProvider = ({ children }) => {
 
     const signOut = async () => {
         try {
-            await firebaseSignOut(auth);
+            await auth.signOut();
             return { success: true };
         } catch (error) {
             return { success: false, error: error.message };
@@ -89,7 +81,7 @@ export const AuthProvider = ({ children }) => {
     const updateUserProfile = async (updates) => {
         if (!user) return { success: false, error: "No user logged in" };
         try {
-            await updateDoc(doc(db, "users", user.uid), updates);
+            await db.collection("users").doc(user.uid).update(updates);
             setUserProfile((prev) => ({ ...prev, ...updates }));
             return { success: true };
         } catch (error) {

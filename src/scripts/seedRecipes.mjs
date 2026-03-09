@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { addDoc, collection, getFirestore, serverTimestamp } from "firebase/firestore";
+import firebase from "firebase/app";
+import "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCOSV9jRrNALr5hMq9ujAzkYYvIfW_HXe4",
@@ -11,8 +11,11 @@ const firebaseConfig = {
     measurementId: "G-3YSPPG6FQM",
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
+const db = firebase.firestore();
 
 const sampleRecipes = [
     {
@@ -48,7 +51,7 @@ const sampleRecipes = [
         ],
         averageRating: 0,
         totalRatings: 0,
-        createdAt: serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     },
     {
         title: "Chicken Caesar Salad",
@@ -80,7 +83,7 @@ const sampleRecipes = [
         ],
         averageRating: 0,
         totalRatings: 0,
-        createdAt: serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     },
     {
         title: "Spaghetti Bolognese",
@@ -112,7 +115,7 @@ const sampleRecipes = [
         ],
         averageRating: 0,
         totalRatings: 0,
-        createdAt: serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     },
     {
         title: "Chocolate Lava Cake",
@@ -144,14 +147,14 @@ const sampleRecipes = [
         ],
         averageRating: 0,
         totalRatings: 0,
-        createdAt: serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     },
 ];
 
 async function seed() {
     console.log("Seeding recipes...");
     for (const recipe of sampleRecipes) {
-        const ref = await addDoc(collection(db, "recipes"), recipe);
+        const ref = await db.collection("recipes").add(recipe);
         console.log(`  Added: ${recipe.title} (${ref.id})`);
     }
     console.log(`Done! Seeded ${sampleRecipes.length} recipes.`);

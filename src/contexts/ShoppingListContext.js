@@ -1,19 +1,5 @@
-import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    updateDoc,
-    where,
-    writeBatch,
-} from "firebase/firestore";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { db } from "../services/firebase";
+import { db, FieldValue } from "../services/firebase";
 import { useAuth } from "./AuthContext";
 
 const ShoppingListContext = createContext();
@@ -23,7 +9,10 @@ export const ShoppingListProvider = ({ children }) => {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    const getListRef = useCallback(() => (user ? collection(db, "users", user.uid, "shoppingList") : null), [user]);
+    const getListRef = useCallback(
+        () => (user ? db.collection("users").doc(user.uid).collection("shoppingList") : null),
+        [user],
+    );
 
     useEffect(() => {
         if (!user) {
@@ -32,11 +21,9 @@ export const ShoppingListProvider = ({ children }) => {
         }
 
         setLoading(true);
-        const listRef = getListRef();
-        const q = query(listRef, orderBy("addedAt", "desc"));
+        const q = getListRef().orderBy("addedAt", "desc");
 
-        const unsubscribe = onSnapshot(
-            q,
+        const unsubscribe = q.onSnapshot(
             (snapshot) => {
                 const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
                 setItems(list);
@@ -56,13 +43,13 @@ export const ShoppingListProvider = ({ children }) => {
             const listRef = getListRef();
             if (!listRef) return;
             try {
-                await addDoc(listRef, {
+                await listRef.add({
                     name: ingredient.name,
                     amount: ingredient.amount || "",
                     unit: ingredient.unit || "",
                     checked: false,
                     recipeTitle,
-                    addedAt: serverTimestamp(),
+                    addedAt: FieldValue.serverTimestamp(),
                 });
             } catch (error) {
                 console.error("Error adding shopping item:", error);
@@ -77,24 +64,22 @@ export const ShoppingListProvider = ({ children }) => {
             if (!listRef) return;
             try {
                 // Fetch existing items to merge duplicates
-                const snapshot = await getDocs(listRef);
+                const snapshot = await listRef.get();
                 const existing = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-                const batch = writeBatch(db);
+                const batch = db.batch();
                 ingredients.forEach((ingredient) => {
                     const name = ingredient.name.toLowerCase().trim();
                     const unit = (ingredient.unit || "").toLowerCase().trim();
-                    // Find existing item with same name and unit
                     const match = existing.find(
                         (e) => e.name.toLowerCase().trim() === name && (e.unit || "").toLowerCase().trim() === unit,
                     );
 
                     if (match) {
-                        // Merge amounts
                         const existingAmt = parseFloat(match.amount) || 0;
                         const newAmt = parseFloat(ingredient.amount) || 0;
                         const mergedAmount = existingAmt + newAmt;
-                        const ref = doc(db, "users", user.uid, "shoppingList", match.id);
+                        const ref = db.collection("users").doc(user.uid).collection("shoppingList").doc(match.id);
                         const existingTitles = (match.recipeTitle || "").split(", ").filter(Boolean);
                         const updatedTitle = existingTitles.includes(recipeTitle)
                             ? match.recipeTitle
@@ -106,14 +91,14 @@ export const ShoppingListProvider = ({ children }) => {
                             recipeTitle: updatedTitle,
                         });
                     } else {
-                        const ref = doc(listRef);
+                        const ref = listRef.doc();
                         batch.set(ref, {
                             name: ingredient.name,
                             amount: ingredient.amount || "",
                             unit: ingredient.unit || "",
                             checked: false,
                             recipeTitle,
-                            addedAt: serverTimestamp(),
+                            addedAt: FieldValue.serverTimestamp(),
                         });
                     }
                 });
@@ -129,7 +114,7 @@ export const ShoppingListProvider = ({ children }) => {
         async (itemId, currentChecked) => {
             if (!user) return;
             try {
-                await updateDoc(doc(db, "users", user.uid, "shoppingList", itemId), {
+                await db.collection("users").doc(user.uid).collection("shoppingList").doc(itemId).update({
                     checked: !currentChecked,
                 });
             } catch (error) {
@@ -143,7 +128,7 @@ export const ShoppingListProvider = ({ children }) => {
         async (itemId) => {
             if (!user) return;
             try {
-                await deleteDoc(doc(db, "users", user.uid, "shoppingList", itemId));
+                await db.collection("users").doc(user.uid).collection("shoppingList").doc(itemId).delete();
             } catch (error) {
                 console.error("Error removing item:", error);
             }
@@ -155,8 +140,8 @@ export const ShoppingListProvider = ({ children }) => {
         const listRef = getListRef();
         if (!listRef) return;
         try {
-            const snapshot = await getDocs(listRef);
-            const batch = writeBatch(db);
+            const snapshot = await listRef.get();
+            const batch = db.batch();
             snapshot.docs.forEach((d) => batch.delete(d.ref));
             await batch.commit();
         } catch (error) {
@@ -168,9 +153,8 @@ export const ShoppingListProvider = ({ children }) => {
         const listRef = getListRef();
         if (!listRef) return;
         try {
-            const q = query(listRef, where("checked", "==", true));
-            const snapshot = await getDocs(q);
-            const batch = writeBatch(db);
+            const snapshot = await listRef.where("checked", "==", true).get();
+            const batch = db.batch();
             snapshot.docs.forEach((d) => batch.delete(d.ref));
             await batch.commit();
         } catch (error) {
