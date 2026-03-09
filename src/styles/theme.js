@@ -1,0 +1,73 @@
+export const Colors = {
+    light: {
+        primary: "#E85D3A",
+        primaryLight: "#FF8A65",
+        primaryDark: "#BF360C",
+        secondary: "#4CAF50",
+        background: "#FAFAFA",
+        surface: "#FFFFFF",
+        surfaceVariant: "#F5F5F5",
+        text: "#212121",
+        textSecondary: "#757575",
+        textInverse: "#FFFFFF",
+        border: "#E0E0E0",
+        error: "#D32F2F",
+        success: "#388E3C",
+        warning: "#F9A825",
+        star: "#FFB300",
+        shadow: "#000000",
+        skeleton: "#E0E0E0",
+        tabBarBackground: "#FFFFFF",
+        tabBarActive: "#E85D3A",
+        tabBarInactive: "#9E9E9E",
+    },
+    dark: {
+        primary: "#FF7043",
+        primaryLight: "#FFAB91",
+        primaryDark: "#E64A19",
+        secondary: "#66BB6A",
+        background: "#121212",
+        surface: "#1E1E1E",
+        surfaceVariant: "#2C2C2C",
+        text: "#FAFAFA",
+        textSecondary: "#B0B0B0",
+        textInverse: "#121212",
+        border: "#333333",
+        error: "#EF5350",
+        success: "#4CAF50",
+        warning: "#FFD54F",
+        star: "#FFB300",
+        shadow: "#000000",
+        skeleton: "#333333",
+        tabBarBackground: "#1E1E1E",
+        tabBarActive: "#FF7043",
+        tabBarInactive: "#757575",
+    },
+};
+
+export const Typography = {
+    h1: { fontSize: 28, fontWeight: "700", lineHeight: 36 },
+    h2: { fontSize: 22, fontWeight: "700", lineHeight: 30 },
+    h3: { fontSize: 18, fontWeight: "600", lineHeight: 26 },
+    body: { fontSize: 16, fontWeight: "400", lineHeight: 24 },
+    bodySmall: { fontSize: 14, fontWeight: "400", lineHeight: 20 },
+    caption: { fontSize: 12, fontWeight: "400", lineHeight: 16 },
+    button: { fontSize: 16, fontWeight: "600", lineHeight: 24 },
+};
+
+export const Spacing = {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+};
+
+export const BorderRadius = {
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
+    full: 9999,
+};

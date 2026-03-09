@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "RecipeApp",
+    "slug": "recipe-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#E85D3A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.recipeapp"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E85D3A"
+      },
+      "package": "com.recipeapp"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4d42b9b4-6c68-4d24-a62b-7ffe72b642ab"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4d42b9b4-6c68-4d24-a62b-7ffe72b642ab"
+    }
+  }
+}
